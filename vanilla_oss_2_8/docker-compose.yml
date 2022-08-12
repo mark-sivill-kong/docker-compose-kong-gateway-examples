@@ -4,7 +4,7 @@
 #
 # Enabled - database backed
 # Not configured - any services, routes, consumers, or plugins
-# Not enabled - SSL/HTTPSe
+# Not enabled - SSL/HTTPS
 #
 # Notes - issue with PostgresQL v14 and Kong Gateway OSS reverting to v13.8 - https://github.com/Kong/kong/issues/8259
 #
