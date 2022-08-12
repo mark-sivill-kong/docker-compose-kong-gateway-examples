@@ -1,0 +1,87 @@
+#
+# Designed to spin up an ephemeral vanilla Kong Gateway Enterprise 2.8
+# for demonstration purposes only not for production
+#
+# Enabled - database backed, manager and developer portal
+# Not configured - any services, routes, consumers, or plugins
+# Not enabled - Role Based Access Control, SSL/HTTPS, or default dev portal workspace
+#
+# ensure environment variable KONG_LICENSE_DATA has been set
+#
+# created by Mark Sivill - August 2022
+#
+
+version: '3.9'
+
+networks:
+  kong-net:
+
+services:
+  kong-database:
+    image: docker.io/library/postgres:14.5
+    restart: on-failure
+    environment:
+      - POSTGRES_DB=kong
+      - POSTGRES_USER=kong
+      - POSTGRES_PASSWORD=kong-password
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "kong"]
+      interval: 5s
+      timeout: 3s
+      start_period: 30s
+      retries: 3
+    networks:
+      - kong-net
+
+  kong-gateway-enterprise-ephemeral-bootstrap:
+    image: docker.io/kong/kong-gateway:2.8
+    command: "kong migrations bootstrap"
+    depends_on:
+      kong-database:
+        condition: service_healthy
+    restart: on-failure:3 
+    environment:
+      - KONG_DATABASE=postgres
+      - KONG_PG_HOST=kong-database
+      - KONG_PG_USER=kong
+      - KONG_PG_PASSWORD=kong-password
+    networks:
+      - kong-net
+
+  kong-gateway-enterprise:
+    image: docker.io/kong/kong-gateway:2.8
+    restart: on-failure
+    depends_on:
+      kong-database:
+        condition: service_healthy
+      kong-gateway-enterprise-ephemeral-bootstrap:
+        condition: service_completed_successfully
+    environment:
+      - KONG_LICENSE_DATA=${KONG_LICENSE_DATA}
+      - KONG_LOG_LEVEL=debug
+      - KONG_DATABASE=postgres
+      - KONG_PG_HOST=kong-database
+      - KONG_PG_PASSWORD=kong-password
+      - KONG_PROXY_ACCESS_LOG=/dev/stdout
+      - KONG_ADMIN_ACCESS_LOG=/dev/stdout
+      - KONG_PROXY_ERROR_LOG=/dev/stderr
+      - KONG_ADMIN_ERROR_LOG=/dev/stderr
+      - KONG_ADMIN_LISTEN=0.0.0.0:8001
+      - KONG_ADMIN_GUI_URL=http://localhost:8002
+      - KONG_PORTAL_GUI_HOST=localhost:8003
+      - KONG_PORTAL_GUI_PROTOCOL=http
+      - KONG_PORTAL=on
+    ports:
+      - 8000:8000    # upstream services
+      - 8001:8001    # kong gateway api
+      - 8002:8002    # kong manager
+      - 8003:8003    # kong dev portal
+      - 8004:8004    # kong dev portal api
+    healthcheck:
+      test: ["CMD", "kong", "health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
+    networks:
+      - kong-net
